@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Marketing Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sora',sans-serif;background:#0A0A0F;color:#F0EEE8;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{background:#111}
+  ::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+  .msg-bubble{animation:fadeUp .3s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .role-btn{cursor:pointer;padding:10px 12px;border-radius:10px;margin-bottom:6px;transition:.2s;border:1px solid transparent}
+  .role-btn:hover{transform:translateY(-2px)}
+  .mode-tab{cursor:pointer;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;transition:.2s;border:1px solid transparent}
+  .mode-tab:hover{background:rgba(255,255,255,.08)}
+  .send-btn{transition:.2s}
+  .send-btn:hover:not(:disabled){filter:brightness(1.2);transform:scale(1.05)}
+  .send-btn:active:not(:disabled){transform:scale(.97)}
+  .chip{transition:.15s;cursor:pointer}
+  .chip:hover{transform:scale(1.05)}
+  textarea:focus{outline:none}
+  .typing-dot{animation:blink 1.2s infinite;width:6px;height:6px;border-radius:50%;display:inline-block}
+  .typing-dot:nth-child(2){animation-delay:.2s}
+  .typing-dot:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  pre{white-space:pre-wrap;word-break:break-word;font-family:'Sora',sans-serif;margin:0}
+  code{font-family:'DM Mono',monospace;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;font-size:12px}
+  #header{background:linear-gradient(90deg,#0F0F1A,#1A0F0F);border-bottom:1px solid #222;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+  #main{display:flex;flex:1;overflow:hidden}
+  #sidebar{width:190px;background:#0D0D15;border-right:1px solid #1A1A2A;padding:16px 10px;overflow-y:auto;flex-shrink:0}
+  #chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  #messages{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px}
+  #input-area{padding:12px 20px 16px;background:#0A0A0F;border-top:1px solid #151525;flex-shrink:0}
+  .input-box{display:flex;gap:10px;align-items:flex-end;background:#111118;border-radius:14px;padding:10px 14px}
+  #chat-input{flex:1;background:transparent;border:none;color:#F0EEE8;font-size:13px;resize:none;line-height:1.6;font-family:'Sora',sans-serif}
+  .section-label{font-size:10px;color:#444;font-weight:700;letter-spacing:1.5px;margin-bottom:10px;padding-left:4px}
+  #api-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center}
+  #api-modal.show{display:flex}
+  .modal-box{background:#111118;border:1px solid #2A2A3A;border-radius:18px;padding:32px;max-width:420px;width:90%}
+  .modal-box input{width:100%;background:#0A0A0F;border:1px solid #333;color:#F0EEE8;padding:10px 14px;border-radius:10px;font-family:'Sora',sans-serif;font-size:13px;margin:10px 0 16px}
+  .modal-box input:focus{outline:none;border-color:#FF6B35}
+  #welcome-screen{text-align:center;margin-top:40px;padding:0 20px}
+  .quick-prompts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:24px}
+  @media(max-width:600px){
+    #sidebar{display:none}
+    #header .mode-tabs{gap:4px}
+    .mode-tab{padding:5px 10px;font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+<!-- API Key Modal -->
+<div id="api-modal" class="show">
+  <div class="modal-box">
+    <div style="font-size:28px;margin-bottom:12px">🔑</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">Masukkan API Key</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:4px">
+      Diperlukan Anthropic API Key untuk menjalankan AI.<br/>
+      Key disimpan di browser kamu saja, tidak dikirim ke mana-mana selain Anthropic.
+    </div>
+    <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off"/>
+    <div style="display:flex;gap:10px">
+      <button onclick="saveApiKey()" style="flex:1;padding:10px;border-radius:10px;border:none;background:#FF6B35;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'Sora',sans-serif">Simpan & Mulai</button>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#555">
+      Belum punya API key? Daftar di <a href="https://console.anthropic.com" target="_blank" style="color:#FF6B35">console.anthropic.com</a>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<div id="header">
+  <div id="role-avatar" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#FF6B35,#222);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📣</div>
+  <div>
+    <div style="font-weight:700;font-size:15px;letter-spacing:.5px">AI Marketing Assistant</div>
+    <div id="role-subtitle" style="font-size:11px;color:#FF6B35;font-weight:600">Mode: Marketing Expert</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap" class="mode-tabs">
+    <div class="mode-tab" id="tab-chat" onclick="setMode('chat')" style="color:#FF6B35;background:#FF6B3522;border-color:#FF6B3544">💬 Chat</div>
+    <div class="mode-tab" id="tab-image" onclick="setMode('image')" style="color:#888">🎨 Gambar</div>
+    <div class="mode-tab" id="tab-analyze" onclick="setMode('analyze')" style="color:#888">🔍 Analisis</div>
+    <div class="mode-tab" onclick="clearChat()" style="color:#555">🗑️</div>
+    <div class="mode-tab" onclick="changeKey()" style="color:#555">🔑</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="section-label">PILIH PERAN</div>
+    <div id="roles-list"></div>
+    <div style="margin-top:16px;border-top:1px solid #1A1A2A;padding-top:14px">
+      <div class="section-label">GAYA GAMBAR</div>
+      <div id="styles-list"></div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div id="chat-area">
+    <div id="messages">
+      <div id="welcome-screen">
+        <div style="font-size:48px;margin-bottom:12px">📣</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px">Halo! Saya Marketing Expert</div>
+        <div style="color:#666;font-size:13px;max-width:400px;margin:0 auto">
+          Siap membantu marketing properti Anda. Pilih mode Chat, buat Gambar, atau Analisis visual.
+        </div>
+        <div class="quick-prompts">
+          <div class="chip" onclick="quickPrompt('Buat caption Instagram untuk perumahan baru')" style="padding:8px 14px;border-radius:20px;background:#151520;border:1px solid #2A2A3A;font-size:12px;color:#AAA">Buat caption Instagram untuk perumahan baru</div>
+          <div class="chip" onclick="quickPrompt('Strategi marketing properti di Kendari')" style="padding:8px 14px;border-radius:20px;background:#151520;border:1px solid #2A2A3A;font-size:12px;color:#AAA">Strategi marketing properti di Kendari</div>
+          <div class="chip" onclick="quickPrompt('Ide konten TikTok untuk developer properti')" style="padding:8px 14px;border-radius:20px;background:#151520;border:1px solid #2A2A3A;font-size:12px;color:#AAA">Ide konten TikTok untuk developer properti</div>
+          <div class="chip" onclick="quickPrompt('Analisis target pasar Gen Z untuk rumah')" style="padding:8px 14px;border-radius:20px;background:#151520;border:1px solid #2A2A3A;font-size:12px;color:#AAA">Analisis target pasar Gen Z untuk rumah</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <div id="upload-row" style="display:none;margin-bottom:10px;gap:8px;align-items:center">
+        <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileUpload(event)"/>
+        <div onclick="document.getElementById('file-input').click()" style="padding:7px 14px;background:#141420;border:1px dashed #333;border-radius:10px;cursor:pointer;font-size:12px;color:#888">📎 Upload Gambar untuk Dianalisis</div>
+        <div id="upload-status" style="font-size:11px;color:#4ECDC4;display:none">✅ Gambar siap dianalisis</div>
+      </div>
+      <div class="input-box" id="input-box" style="border:1px solid #FF6B3533">
+        <textarea id="chat-input" rows="2" placeholder="Tanya Marketing Expert sesuatu tentang marketing..." onkeydown="handleKeyDown(event)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="handleSend()" style="padding:8px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF6B35,#FF6B35AA);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Sora',sans-serif">➤ Kirim</button>
+      </div>
+      <div id="input-hint" style="font-size:10px;color:#333;margin-top:6px;padding-left:4px">Enter untuk kirim • Marketing Expert aktif • Mode: Chat</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ROLES = [
+  {id:"marketing",icon:"📣",label:"Marketing Expert",color:"#FF6B35",
+   prompt:"Kamu adalah Marketing Expert senior dengan pengalaman 15 tahun di digital marketing, branding, copywriting, iklan, dan strategi pemasaran. Jawab dalam Bahasa Indonesia. Berikan saran yang actionable, kreatif, dan berbasis data."},
+  {id:"copywriter",icon:"✍️",label:"Copywriter",color:"#F7C59F",
+   prompt:"Kamu adalah Copywriter profesional yang ahli membuat headline, caption media sosial, script iklan, dan konten yang menarik dan persuasif. Jawab dalam Bahasa Indonesia. Gunakan bahasa yang memikat, emosional, dan mendorong aksi."},
+  {id:"analyst",icon:"📊",label:"Data Analyst",color:"#4ECDC4",
+   prompt:"Kamu adalah Data Analyst marketing yang ahli menganalisis performa kampanye, tren pasar, perilaku konsumen, dan memberikan insight berbasis data. Jawab dalam Bahasa Indonesia dengan analisis mendalam."},
+  {id:"designer",icon:"🎨",label:"Creative Director",color:"#A8DADC",
+   prompt:"Kamu adalah Creative Director yang ahli dalam konsep visual, desain brand, dan arahan kreatif untuk konten marketing. Jawab dalam Bahasa Indonesia. Berikan brief visual yang detail dan konsep kreatif yang segar."},
+  {id:"strategist",icon:"🎯",label:"Brand Strategist",color:"#E63946",
+   prompt:"Kamu adalah Brand Strategist yang ahli dalam positioning merek, target audience, brand voice, dan strategi jangka panjang. Jawab dalam Bahasa Indonesia dengan pendekatan strategis."},
+  {id:"social",icon:"📱",label:"Social Media Manager",color:"#F4A261",
+   prompt:"Kamu adalah Social Media Manager yang ahli Instagram, TikTok, Facebook, dan platform digital lainnya. Jawab dalam Bahasa Indonesia. Berikan strategi konten, jadwal posting, dan ide konten viral."},
+];
+const IMAGE_STYLES = [
+  {id:"photorealistic",label:"Fotorealistik"},
+  {id:"flat illustration",label:"Flat Ilustrasi"},
+  {id:"3d render",label:"3D Render"},
+  {id:"minimalist",label:"Minimalis"},
+  {id:"vintage poster",label:"Poster Vintage"},
+];
+
+let activeRole = ROLES[0];
+let activeStyle = IMAGE_STYLES[0];
+let currentMode = 'chat';
+let messages = [];
+let uploadedBase64 = null;
+let uploadedPreview = null;
+let apiKey = localStorage.getItem('ai_mkt_key') || '';
+
+// Init
+if(apiKey) document.getElementById('api-modal').classList.remove('show');
+
+function saveApiKey(){
+  const k = document.getElementById('api-key-input').value.trim();
+  if(!k){alert('Masukkan API key terlebih dahulu!');return;}
+  apiKey = k;
+  localStorage.setItem('ai_mkt_key', k);
+  document.getElementById('api-modal').classList.remove('show');
+}
+function changeKey(){
+  document.getElementById('api-key-input').value = apiKey;
+  document.getElementById('api-modal').classList.add('show');
+}
+
+// Render sidebar
+function renderSidebar(){
+  const rl = document.getElementById('roles-list');
+  rl.innerHTML = ROLES.map(r=>`
+    <div class="role-btn" onclick="setRole('${r.id}')" id="rbtn-${r.id}"
+      style="background:${activeRole.id===r.id?r.color+'18':'transparent'};border-color:${activeRole.id===r.id?r.color+'44':'transparent'}">
+      <div style="font-size:18px;margin-bottom:2px">${r.icon}</div>
+      <div style="font-size:11px;font-weight:600;color:${activeRole.id===r.id?r.color:'#888'}">${r.label}</div>
+    </div>`).join('');
+  const sl = document.getElementById('styles-list');
+  sl.innerHTML = IMAGE_STYLES.map(s=>`
+    <div class="chip" onclick="setStyle('${s.id}')"
+      style="padding:6px 10px;border-radius:8px;margin-bottom:4px;font-size:11px;
+             background:${activeStyle.id===s.id?activeRole.color+'22':'transparent'};
+             color:${activeStyle.id===s.id?activeRole.color:'#666'};
+             border:1px solid ${activeStyle.id===s.id?activeRole.color+'33':'transparent'}">${s.label}</div>`).join('');
+}
+
+function setRole(id){
+  activeRole = ROLES.find(r=>r.id===id);
+  document.getElementById('role-avatar').style.background = `linear-gradient(135deg,${activeRole.color},#222)`;
+  document.getElementById('role-avatar').textContent = activeRole.icon;
+  document.getElementById('role-subtitle').style.color = activeRole.color;
+  document.getElementById('role-subtitle').textContent = `Mode: ${activeRole.label}`;
+  document.getElementById('input-box').style.borderColor = activeRole.color+'33';
+  document.getElementById('send-btn').style.background = `linear-gradient(135deg,${activeRole.color},${activeRole.color}AA)`;
+  updateModeUI();
+  renderSidebar();
+}
+
+function setStyle(id){ activeStyle = IMAGE_STYLES.find(s=>s.id===id); renderSidebar(); updateInputPlaceholder(); }
+
+function setMode(m){
+  currentMode = m;
+  ['chat','image','analyze'].forEach(tab=>{
+    const el = document.getElementById('tab-'+tab);
+    if(tab===m){el.style.color=activeRole.color;el.style.background=activeRole.color+'22';el.style.borderColor=activeRole.color+'44';}
+    else{el.style.color='#888';el.style.background='transparent';el.style.borderColor='transparent';}
+  });
+  document.getElementById('upload-row').style.display = m==='analyze'?'flex':'none';
+  updateInputPlaceholder();
+  updateHint();
+}
+
+function updateModeUI(){ setMode(currentMode); }
+
+function updateInputPlaceholder(){
+  const el = document.getElementById('chat-input');
+  if(currentMode==='image') el.placeholder=`Deskripsikan gambar yang ingin dibuat... (gaya: ${activeStyle.label})`;
+  else if(currentMode==='analyze') el.placeholder='Tanya sesuatu tentang gambar yang diupload...';
+  else el.placeholder=`Tanya ${activeRole.label} sesuatu tentang marketing...`;
+}
+
+function updateHint(){
+  const modeLabel = currentMode==='image'?'Generate Gambar':currentMode==='analyze'?'Analisis Visual':'Chat';
+  document.getElementById('input-hint').textContent = `Enter untuk kirim • ${activeRole.label} aktif • Mode: ${modeLabel}`;
+  document.getElementById('role-subtitle').textContent = `Mode: ${activeRole.label}`;
+}
+
+function handleKeyDown(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}
+}
+
+function handleSend(){
+  if(currentMode==='image') generateImage();
+  else sendChat();
+}
+
+function quickPrompt(txt){
+  document.getElementById('chat-input').value = txt;
+  setMode('chat');
+  sendChat();
+}
+
+function clearChat(){
+  messages=[];uploadedBase64=null;uploadedPreview=null;
+  document.getElementById('upload-status').style.display='none';
+  const container = document.getElementById('messages');
+  container.innerHTML = `
+    <div id="welcome-screen" style="text-align:center;margin-top:40px;padding:0 20px">
+      <div style="font-size:48px;margin-bottom:12px">${activeRole.icon}</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:8px">Halo! Saya ${activeRole.label}</div>
+      <div style="color:#666;font-size:13px;max-width:400px;margin:0 auto">Siap membantu marketing properti Anda.</div>
+      <div class="quick-prompts">
+        <div class="chip" onclick="quickPrompt('Buat caption Instagram untuk perumahan baru')" style="padding:8px 14px;border-radius:20px;background:#151520;border:1px solid #2A2A3A;font-size:12px;color:#AAA">Buat caption Instagram untuk perumahan baru</div>
+        <div class="chip" onclick="quickPrompt('Strategi marketing properti di Kendari')" style="padding:8px 14px;border-radius:20px;background:#151520;border:1px solid #2A2A3A;font-size:12px;color:#AAA">Strategi marketing properti di Kendari</div>
+      </div>
+    </div>`;
+}
+
+function addMessage(role, content, imgSrc=null){
+  const welcome = document.getElementById('welcome-screen');
+  if(welcome) welcome.remove();
+  const container = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-bubble';
+  wrap.style.display='flex';
+  wrap.style.justifyContent = role==='user'?'flex-end':'flex-start';
+  wrap.style.gap='10px';
+  wrap.style.alignItems='flex-start';
+
+  let avatarHtml = '';
+  if(role==='assistant'){
+    avatarHtml=`<div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,${activeRole.color},#222);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px">${activeRole.icon}</div>`;
+  }
+  const imgHtml = imgSrc?`<img src="${imgSrc}" style="max-width:200px;border-radius:8px;margin-bottom:8px;display:block"/>`:'' ;
+  const bg = role==='user'?`linear-gradient(135deg,${activeRole.color}CC,${activeRole.color}88)`:'#141420';
+  const br = role==='user'?'18px 18px 4px 18px':'4px 18px 18px 18px';
+  const border = role==='assistant'?'border:1px solid #222;':'';
+  wrap.innerHTML = `${avatarHtml}<div style="max-width:72%;padding:12px 16px;border-radius:${br};background:${bg};${border}font-size:13px;line-height:1.7">${imgHtml}<pre>${escapeHtml(content)}</pre></div>`;
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addImageResult(url, prompt, original){
+  const welcome = document.getElementById('welcome-screen');
+  if(welcome) welcome.remove();
+  const container = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-bubble';
+  wrap.innerHTML = `
+    <div style="background:#141420;border:1px solid ${activeRole.color}44;border-radius:16px;padding:16px;max-width:600px">
+      <div style="font-size:12px;color:${activeRole.color};font-weight:700;margin-bottom:8px">🖼️ HASIL GAMBAR AI</div>
+      <img src="${url}" alt="generated" style="width:100%;border-radius:10px;margin-bottom:10px" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+      <div style="display:none;padding:20px;text-align:center;color:#555;font-size:12px;border:1px dashed #333;border-radius:8px">⏳ Gambar sedang dibuat, klik link di bawah untuk melihat...</div>
+      <div style="font-size:11px;color:#555">Prompt: <span style="color:#888">${escapeHtml(prompt.substring(0,120))}...</span></div>
+      <a href="${url}" target="_blank" style="display:inline-block;margin-top:8px;padding:6px 14px;background:${activeRole.color}22;color:${activeRole.color};border-radius:8px;font-size:12px;text-decoration:none;border:1px solid ${activeRole.color}44">🔗 Buka / Download Gambar</a>
+    </div>`;
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping(){
+  const container = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.id='typing-indicator';el.className='msg-bubble';
+  el.style.cssText='display:flex;gap:10px;align-items:center';
+  el.innerHTML=`<div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,${activeRole.color},#222);display:flex;align-items:center;justify-content:center;font-size:14px">${activeRole.icon}</div>
+    <div style="padding:12px 18px;background:#141420;border-radius:4px 18px 18px 18px;border:1px solid #222;display:flex;gap:5px;align-items:center">
+      <span class="typing-dot" style="background:${activeRole.color}"></span>
+      <span class="typing-dot" style="background:${activeRole.color}"></span>
+      <span class="typing-dot" style="background:${activeRole.color}"></span>
+    </div>`;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideTyping(){ const el=document.getElementById('typing-indicator');if(el)el.remove(); }
+
+function setBtnLoading(loading){
+  const btn = document.getElementById('send-btn');
+  btn.disabled = loading;
+  btn.textContent = loading?'⏳':currentMode==='image'?'🎨 Buat':'➤ Kirim';
+  btn.style.background = loading?'#333':`linear-gradient(135deg,${activeRole.color},${activeRole.color}AA)`;
+}
+
+function getSystemPrompt(){
+  if(currentMode==='analyze'){
+    return activeRole.prompt+'\n\nKamu juga ahli menganalisis gambar untuk keperluan marketing: review visual brand, konten kompetitor, desain iklan, foto produk, dan konten media sosial. Berikan analisis mendalam dan rekomendasi konkret.';
+  }
+  return activeRole.prompt;
+}
+
+async function sendChat(){
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if(!text && !uploadedBase64) return;
+  if(!apiKey){alert('Masukkan API key terlebih dahulu!');changeKey();return;}
+
+  const userContent = text || 'Tolong analisis gambar ini untuk keperluan marketing.';
+  addMessage('user', userContent, uploadedPreview);
+  input.value='';
+
+  const apiMsg = {role:'user', content: uploadedBase64
+    ? [{type:'image',source:{type:'base64',media_type:'image/jpeg',data:uploadedBase64}},{type:'text',text:userContent}]
+    : userContent
+  };
+  messages.push(apiMsg);
+
+  uploadedBase64=null; uploadedPreview=null;
+  document.getElementById('upload-status').style.display='none';
+
+  setBtnLoading(true); showTyping();
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:getSystemPrompt(),messages})
+    });
+    const data = await res.json();
+    if(data.error){hideTyping();addMessage('assistant','⚠️ Error: '+data.error.message);setBtnLoading(false);return;}
+    const reply = data.content?.map(b=>b.text||'').join('')||'Maaf, terjadi kesalahan.';
+    messages.push({role:'assistant',content:reply});
+    hideTyping(); addMessage('assistant',reply);
+  }catch(e){
+    hideTyping(); addMessage('assistant','⚠️ Gagal terhubung. Periksa API key dan koneksi internet.');
+  }
+  setBtnLoading(false);
+}
+
+async function generateImage(){
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if(!text) return;
+  if(!apiKey){alert('Masukkan API key terlebih dahulu!');changeKey();return;}
+
+  const userInput = text; input.value='';
+  addMessage('user',`[🎨 Generate Gambar] ${userInput}`);
+  setBtnLoading(true); showTyping();
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',max_tokens:1000,
+        system:'Kamu adalah ahli membuat prompt untuk AI image generator. Ubah permintaan user menjadi prompt gambar sangat detail dalam Bahasa Inggris. Output: hanya prompt Inggris saja, tanpa teks lain. Tambahkan keyword kualitas: highly detailed, professional photography, 8k, award winning.',
+        messages:[{role:'user',content:`Buat gambar marketing: ${userInput}. Gaya: ${activeStyle.label}. Konteks: properti/real estate di Kendari Indonesia.`}]
+      })
+    });
+    const data = await res.json();
+    if(data.error){hideTyping();addMessage('assistant','⚠️ Error: '+data.error.message);setBtnLoading(false);return;}
+    const prompt = data.content?.map(b=>b.text||'').join('').trim();
+    const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt+`, ${activeStyle.id} style, marketing visual, Indonesia`)}?width=1024&height=576&nologo=true`;
+    hideTyping();
+    addMessage('assistant',`✅ Prompt gambar dibuat! Gambar sedang diproses...`);
+    addImageResult(imgUrl, prompt, userInput);
+  }catch(e){
+    hideTyping(); addMessage('assistant','⚠️ Gagal generate gambar. Periksa koneksi internet.');
+  }
+  setBtnLoading(false);
+}
+
+function handleFileUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    uploadedBase64 = ev.target.result.split(',')[1];
+    uploadedPreview = ev.target.result;
+    document.getElementById('upload-status').style.display='block';
+    setMode('analyze');
+  };
+  reader.readAsDataURL(file);
+}
+
+function escapeHtml(t){
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Init render
+renderSidebar();
+setMode('chat');
+</script>
+</body>
+</html>
